@@ -1,54 +1,69 @@
-/**
- * Name: DivisionDisplay
- * Version: 1.0
- * Author: eggseal
- * Description:
- *   Makes a division between to numbers making use of a LCD display and a Matrix Keypad
- */
+
+/*
+  Name: DivisionDisplay
+  Version: 1.0
+  Author: eggseal
+  Description:
+    Makes a division between to numbers making use of a LCD display and a Matrix Keypad
+*/
 
 //  Libraries
 #include <Wire.h> //  Built-in
+#include <LiquidCrystal.h> //  Built-in
 #include <Keypad.h> //  "Keypad" by "Mark Stanley, Alexander Brevig"
 #include <LiquidCrystal_I2C.h> //  "LiquidCrystal I2C" by "Frank de Brabander"
 
+#define DEBUG
+
 //  Constants
-const byte ROWS = 4;
-const byte COLS = 3;
-const byte ROW_PINS[ROWS] = {2, 3, 4, 5};
-const byte COL_PINS[COLS] = {6, 7, 8};
-const char keys[ROWS][COLS] = {
-  { '1', '2', '3' },
-  { '4', '5', '6' },
-  { '7', '8', '9' },
-  { '/', '0', '=' }
-};
+const unsigned short ROWS = 4; //  Amount of rows of matrix keypad
+const unsigned short COLS = 3; //  Amount of columns of matrix keypad
+const byte ROW_PINS[ROWS] = {2, 3, 4, 5}; //  Pins of keypad rows
+const byte COL_PINS[COLS] = {6, 7, 8}; //  Pins of keypad columns
+const char KEYS[ROWS][COLS] = {
+  {'1', '2', '3'},
+  {'4', '5', '6'},
+  {'7', '8', '9'},
+  {'/', '=', '#'}
+}; //  Keypad character matrix
 
 //  Library constants
-Keypad keypad = Keypad(makeKeymap(keys), ROW_PINS, COL_PINS, ROWS, COLS);
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+Keypad KEYPAD = Keypad(makeKeymap(KEYS), ROW_PINS, COL_PINS, ROWS, COLS);
+// LiquidCrystal_I2C lcd(0x27, 16, 2);
+LiquidCrystal lcd(2,3,4,6,7,8,9);
 
 //  Variables
-int writing = 0;
-int result = 0;
-char key, keyUnit, keyDec;
-int unit = 0;
-int dec = 0;
+int writing = 0; //  The index of the screen's second line
+int result = 0; //  The result of the operation
+char key, keyUnit, keyTens; //  The input keys
+int unit = 0; //  The value of the input units
+int tens = 0; //  The value of the input tens
 
 //  Sub-routines
-void write(char c, int &writing) {
-  lcd.setCursor(writing, 1);
-  lcd.print(c);
+/**
+ * Write a character on the second line of the LCD screen in a given index and moves to the next
+ * @param character The character to write
+ * @param index The position of the character
+ */
+void writeLCD(char character, int &index) {
+  //  Write on the index
+  lcd.setCursor(index, 1);
+  lcd.print(character);
   delay(10);
 
-  writing++;
-  if (writing >= 16) writing = 0;
+  //  Move to the next position or loop around if at the end
+  index++;
+  if (index >= 16) index = 0;
 }
 
 void setup() {
   //  Library initialization
-  lcd.init();
-  lcd.backlight();
-  lcd.print("Teclado");
+  // lcd.init();
+  // lcd.backlight();
+  // lcd.print("Teclado");
+  lcd.begin(16, 2);
+  lcd.setCursor(0, 0);
+  lcd.print("Mensaje")
 
   //  Comms
   Serial.begin(9600);
@@ -56,47 +71,60 @@ void setup() {
 
 void loop() {
   //  Get key and execute loop only when one is pressed
-  key = keypad.getKey();
-  if (key == NO_KEY) return;
+  key = KEYPAD.getKey();
+  if (!key) return;
 
   //  Convert the key to respective number
-  unit = keyUnit - '0';
-  dec = (keyDec - '0') * 10;
+  unit = keyUnit ? keyUnit - '0' : 0;
+  tens = keyTens ? (keyTens - '0') * 10 : 0;
+
+  //  Debug logs
+  #ifdef DEBUG
+  Serial.println();
+  Serial.print("Unit: ");
+  Serial.print(keyUnit);
+  Serial.print(" - Value: ");
+  Serial.println(unit);
+  Serial.print("Tens: ");
+  Serial.print(keyTens);
+  Serial.print(" - Value: ");
+  Serial.println(tens);
+  #endif
 
   if (key == '/') {
     //  Set the input value as the temporary result
-    result += dec + unit;
+    result = tens + unit;
 
     //  Reset the keys and restart the loop
-    keyDec = '0';
+    keyTens = '0';
     keyUnit = '0';
-    write('/', writing);
+    writeLCD('/', writing);
+    #ifdef DEBUG
+    Serial.println(result);
+    #endif
     return;
   }
   if (key == '=') {
     //  Divide the stored result by the input number
-    result /= dec + unit;
+    result /= tens + unit;
 
     //  Set a temporary writing index for writing at the end
     int w = 13;
-    write((int) (result / 100) % 10, w);
-    write((int) (result / 10) % 10, w);
-    write(result % 10, w);
+    writeLCD((int) (result / 100) % 10, w);
+    writeLCD((int) (result / 10) % 10, w);
+    writeLCD(result % 10, w);
 
     //  Reset the result for the next operation
+    #ifdef DEBUG
+    Serial.println("Result: " + String(result));
+    #endif
     result = 0;
   }
 
   //  Write the input is its written
-  write(key, writing);
+  writeLCD(key, writing);
 
   //  Move the units to the next order
-  keyDec = keyUnit;
+  keyTens = keyUnit ;
   keyUnit = key;
-
-  //  Debug prints
-  Serial.println("-------------");
-  Serial.println(result);
-  Serial.println(keyUnit);
-  Serial.println(keyDec);
 }
