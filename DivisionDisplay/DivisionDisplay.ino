@@ -11,7 +11,6 @@
 #include <Wire.h> //  Built-in
 #include <LiquidCrystal.h> //  Built-in
 #include <Keypad.h> //  "Keypad" by "Mark Stanley, Alexander Brevig"
-#include <LiquidCrystal_I2C.h> //  "LiquidCrystal I2C" by "Frank de Brabander"
 
 #define DEBUG
 
@@ -24,13 +23,12 @@ const char KEYS[ROWS][COLS] = {
   {'1', '2', '3'},
   {'4', '5', '6'},
   {'7', '8', '9'},
-  {'/', '=', '#'}
+  {'/', '0', '='}
 }; //  Keypad character matrix
 
 //  Library constants
 Keypad KEYPAD = Keypad(makeKeymap(KEYS), ROW_PINS, COL_PINS, ROWS, COLS);
-// LiquidCrystal_I2C lcd(0x27, 16, 2);
-LiquidCrystal lcd(2,3,4,6,7,8,9);
+LiquidCrystal lcd(48, 49, 45, 44, 43, 42); //  RS E D4 D5 D6 D7
 
 //  Variables
 int writing = 0; //  The index of the screen's second line
@@ -49,6 +47,21 @@ void writeLCD(char character, int &index) {
   //  Write on the index
   lcd.setCursor(index, 1);
   lcd.print(character);
+
+  Serial.println("Writing " + String(character) + " on position " + String(index));
+  delay(10);
+
+  //  Move to the next position or loop around if at the end
+  index++;
+  if (index >= 16) index = 0;
+}
+
+void writeLCD(String text, int &index) {
+    //  Write on the index
+  lcd.setCursor(index, 1);
+  lcd.print(text);
+
+  Serial.println("Writing " + text + " on position " + String(index));
   delay(10);
 
   //  Move to the next position or loop around if at the end
@@ -57,13 +70,13 @@ void writeLCD(char character, int &index) {
 }
 
 void setup() {
+  //  LCD RW Pin to GND
+  pinMode(47, OUTPUT);
+  digitalWrite(47, LOW);
+
   //  Library initialization
-  // lcd.init();
-  // lcd.backlight();
-  // lcd.print("Teclado");
   lcd.begin(16, 2);
-  lcd.setCursor(0, 0);
-  lcd.print("Mensaje")
+  lcd.print("Mensaje");
 
   //  Comms
   Serial.begin(9600);
@@ -99,6 +112,7 @@ void loop() {
     keyTens = '0';
     keyUnit = '0';
     writeLCD('/', writing);
+
     #ifdef DEBUG
     Serial.println(result);
     #endif
@@ -110,9 +124,10 @@ void loop() {
 
     //  Set a temporary writing index for writing at the end
     int w = 13;
-    writeLCD((int) (result / 100) % 10, w);
-    writeLCD((int) (result / 10) % 10, w);
-    writeLCD(result % 10, w);
+
+    writeLCD(String((int) result / 100 % 10), w);
+    writeLCD(String((int) result / 10 % 10), w);
+    writeLCD(String(result % 10), w);
 
     //  Reset the result for the next operation
     #ifdef DEBUG
